@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Redmine Report Sample</title>
+
+    <!-- jQuery読み込み -->
+    <script
+        src="https://code.jquery.com/jquery-2.2.4.min.js"
+        integrity="sha256-BbhdlvQf/xTY9gja0Dq3HiwQF8LaCRTXxZKRutelT44="
+        crossorigin="anonymous"></script>
+
+    <!-- Bootstrap読み込み -->
+    <link
+        rel="stylesheet"
+        href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css"
+        integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u"
+        crossorigin="anonymous">
+    <link
+        rel="stylesheet"
+        href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap-theme.min.css"
+        integrity="sha384-rHyoN1iRsVXV4nD0JutlnGaslCJuC7uwjduW9SVrLvRYooPp2bWYgmgJQIXwl/Sp"
+        crossorigin="anonymous">
+    <script
+        src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"
+        integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa"
+        crossorigin="anonymous"></script>
+
+    <!-- 独自CSS定義:ここから -->
+    <style type="text/css">
+        body {
+            width: 100%;
+            font-family: "ヒラギノ角ゴ Pro W3", "Hiragino Kaku Gothic Pro", Arial, "メイリオ", Meiryo, "ＭＳ ゴシック", sans-serif !important;
+            font-size: 16px;
+        }
+
+        input,
+        select {
+            font-family: "ヒラギノ角ゴ Pro W3", "Hiragino Kaku Gothic Pro", Arial, "メイリオ", Meiryo, "ＭＳ ゴシック", sans-serif !important;
+            font-size: 0.8em;
+        }
+
+        .navbar-header {
+            padding-top: 15px;
+            padding-bottom: 15px;
+            padding-left: 20px;
+            padding-right: 20px;
+            font-size: 1.3em;
+            color: #fff;
+        }
+
+        .container {
+            margin-top: 70px;
+        }
+
+        .table-area {
+             overflow: scroll;
+             height: 500px;
+        }
+
+        .table {
+             table-layout: fixed;
+        }
+
+        .col-size1 {
+            width: 150px;
+        }
+
+        .footer {
+            text-align: center;
+        }
+    </style>
+    <!-- 独自CSS定義:ここまで -->
+
+    <!-- 独自スクリプト定義:ここから -->
+    <script>
+        // 共通変数定義
+        var issues      = []; // チケット一覧用配列
+        var name_list   = []; // チケットIDに紐づくチケット名一覧用配列
+        var pages       = 0;  // Redmineのページ数(チケット数/100+1)
+        var pages_cnt   = 0;  // pagesのループカウント
+        var i           = 0;  // for文用インデックス
+
+        /**
+         * 画面読み込み後イベント
+         *
+         */
+        $(function(){
+            var key         = '接続するユーザーのAPIキー'; // APIキー
+            var project_id  = '1'; // プロジェクトID
+            var redmine_url = 'http://対象のRedmineURL/';
+            var base_url    = redmine_url + 'issues.json?key=' + key + '&project_id=' + project_id + '&limit=100&status_id=*'; // API連携用URL
+
+            // Redmineから情報を取得し、DOMを生成する
+            getIssues(base_url, 1);
+
+        });
+
+        /**
+         * Redmineから情報を取得する関数
+         *
+         */
+        function getIssues(url, page_no) {
+            $.ajax({
+                type: 'GET',
+                url: url + '&page=' + page_no,
+                dataType: 'jsonp',
+                async: false,
+                success: function(json){
+                    var len = json.issues.length;
+                    for(var i = 0; i < len; i++){
+                        // チケット一覧に追加
+                        issues.push(json.issues[i]);
+
+                        // チケットIDに紐づくチケット名一覧に追加
+                        name_list[json.issues[i].id] = json.issues[i].subject;
+                    }
+
+                    // ページ数を取得
+                    pages = (json.total_count / json.limit) + 1;
+
+                    // ページ数がまだあるようであれば再帰処理を行う
+                    if (pages > page_no) {
+                        getIssues(url, page_no + 1);
+                    }
+                    // 全チケットが取得出来たら後続処理を行う
+                    else {
+                        // 一覧用DOMを生成する
+                        if (issues.length == 0) {
+                            alert('Redmineのデータは0件でした');
+                        }
+                        else {
+                            createDom();
+                        }
+                    }
+                }
+
+            });
+
+        }
+
+        /**
+         * Redmineのチケット情報をもとにDOMを生成する
+         *
+         */
+        function createDom() {
+            // DOM格納用変数初期化
+            var html = '';
+
+            var html_id             = '';
+            var html_tracker        = '';
+            var html_parent         = '';
+            var html_subject        = '';
+            var html_assigned_to    = '';
+            var html_status         = '';
+            var html_start_date     = '';
+            var html_due_date       = '';
+            var html_done_ratio     = '';
+            var html_closed_on      = '';
+
+            for (var i = 0; i < issues.length; i++) {
+                html += '<tr>';
+
+                if (issues[i].id          != undefined) { html_id           = issues[i].id                    } else { html_id           = ''; }
+                if (issues[i].tracker     != undefined) { html_tracker      = issues[i].tracker.name          } else { html_tracker      = ''; }
+                if (issues[i].parent      != undefined) { html_parent       = name_list[issues[i].parent.id]  } else { html_parent       = ''; }
+                if (issues[i].subject     != undefined) { html_subject      = issues[i].subject               } else { html_subject      = ''; }
+                if (issues[i].assigned_to != undefined) { html_assigned_to  = issues[i].assigned_to.name      } else { html_assigned_to  = ''; }
+                if (issues[i].status.name != undefined) { html_status       = issues[i].status.name           } else { html_status       = ''; }
+                if (issues[i].start_date  != undefined) { html_start_date   = issues[i].start_date            } else { html_start_date   = ''; }
+                if (issues[i].due_date    != undefined) { html_due_date     = issues[i].due_date              } else { html_due_date     = ''; }
+                if (issues[i].done_ratio  != undefined) { html_done_ratio   = issues[i].done_ratio            } else { html_done_ratio   = ''; }
+                if (issues[i].closed_on   != undefined) { html_closed_on    = issues[i].closed_on.substr(0,10)} else { html_closed_on    = ''; }
+
+                html += '<td>' + html_id          + '</td>'
+                     +  '<td>' + html_tracker     + '</td>'
+                     +  '<td>' + html_parent      + '</td>'
+                     +  '<td>' + html_subject     + '</td>'
+                     +  '<td>' + html_assigned_to + '</td>'
+                     +  '<td>' + html_status      + '</td>'
+                     +  '<td>' + html_start_date  + '</td>'
+                     +  '<td>' + html_due_date    + '</td>'
+                     +  '<td>' + html_done_ratio  + '</td>'
+                     +  '<td>' + html_closed_on   + '</td>'
+                     ;
+
+                html += '</tr>';
+
+            }
+
+            // テーブルのtbodyに生成したDOMを追加
+            $('.table > tbody').append(html);
+
+        }
+
+    </script>
+    <!-- 独自スクリプト定義:ここまで -->
+
+</head>
+
+<body>
+    <!-- ヘッダー画面:ここから -->
+    <header>
+        <nav class="navbar navbar-inverse navbar-fixed-top">
+            <div class="navbar-header">
+                Redmine Report
+            </div>
+        </nav>
+    </header>
+    <!-- ヘッダー画面:ここまで -->
+
+    <!-- コンテンツ画面:ここから -->
+    <div class="container">
+        <div class="row">
+            <h1>レポート</h1>
+            <div class="col-xs-12">
+                <!-- 一覧 -->
+                <div class="col-xs-12">
+                    <div class="container-box">
+                        <div class="col-xs-12 table-area">
+                            <table class="table table-striped">
+                                <colgroup>
+                                    <col class="col-size1" />
+                                    <col class="col-size1" />
+                                    <col class="col-size1" />
+                                    <col class="col-size1" />
+                                    <col class="col-size1" />
+                                    <col class="col-size1" />
+                                    <col class="col-size1" />
+                                    <col class="col-size1" />
+                                    <col class="col-size1" />
+                                    <col class="col-size1" />
+                                </colgroup>
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>トラッカー</th>
+                                        <th>親チケット</th>
+                                        <th>題名</th>
+                                        <th>担当者名</th>
+                                        <th>ステータス</th>
+                                        <th>開始日</th>
+                                        <th>期日</th>
+                                        <th>進捗率</th>
+                                        <th>終了日</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- jQueryにてDOMを生成する -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- コンテンツ画面:ここまで -->
+
+    <!-- フッター画面:ここから -->
+    <footer class="footer">
+        <div class="container">
+            <p class="text-muted">フッター</p>
+        </div>
+    </footer>
+    <!-- フッター画面:ここまで -->
+
+</body>
+
+</html>
